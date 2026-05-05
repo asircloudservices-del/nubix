@@ -10,6 +10,7 @@ set -e
 # Variables del script
 IFACE_WAN="ens18" # Interfaz externa
 IFACE_LAN="ens19" # Interfaz interna
+IFACE_VPN="ztfl6ad7yu" # Interfaz de VPN
 
 RED_VPN="192.168.33.0"
 IP_ACCESO_LAN="10.10.10.10"
@@ -92,9 +93,27 @@ NAT_BLOCK="# Reglas NAT
 -A PREROUTING -i ${IFACE_WAN} -p tcp --dport 587 -j DNAT \
     --to-destination ${IP_HOSTING}:587
 
+# Repetimos para accesos vía VPN
+-A PREROUTING -i ${IFACE_VPN} -p udp --dport 53 -j DNAT \
+    --to-destination ${IP_HOSTING}:53
+
+-A PREROUTING -i ${IFACE_VPN} -p tcp --dport 53 -j DNAT \
+    --to-destination ${IP_HOSTING}:53
+
+-A PREROUTING -i ${IFACE_VPN} -p tcp --dport 993 -j DNAT \
+    --to-destination ${IP_HOSTING}:993
+
+-A PREROUTING -i ${IFACE_VPN} -p tcp --dport 587 -j DNAT \
+    --to-destination ${IP_HOSTING}:587
+
+
 # Después de enrutar el tráfico de la red interna de los servidores, saldrá por la interfaz WAN si es una conexión hacia fuera
 # Se enmascara la dirección interna de los servidores con la IP asociada a la interfaz WAN
 -A POSTROUTING -s ${IP_RED_INTERNA}/${MASCARA} -o ${IFACE_WAN} \
+    -j MASQUERADE
+
+# Repetimos para VPN
+-A POSTROUTING -s ${IP_RED_INTERNA}/${MASCARA} -o ${IFACE_VPN} \
     -j MASQUERADE
 
 COMMIT
@@ -142,6 +161,31 @@ sudo ufw allow in on "${IFACE_WAN}" \
     comment "IMAPS - DNAT redirige a Dovecot en SERVIDOR_SERVICIOS"
 
 sudo ufw allow in on "${IFACE_WAN}" \
+    to any port 587 proto tcp \
+    comment "SMTP submission"
+
+# Repetimos para accesos desde VPN:
+sudo ufw allow in on "${IFACE_VPN}" \
+    to any port 80 proto tcp \
+    comment "Se permite HTTP para el acceso a sitios web"
+
+sudo ufw allow in on "${IFACE_VPN}" \
+    to any port 443 proto tcp \
+    comment "HTTPS - trafico web principal via NPM"
+
+sudo ufw allow in on "${IFACE_VPN}" \
+    to any port 53 proto udp \
+    comment "DNS UDP"
+
+sudo ufw allow in on "${IFACE_VPN}" \
+    to any port 53 proto tcp \
+    comment "DNS TCP"
+
+sudo ufw allow in on "${IFACE_VPN}" \
+    to any port 993 proto tcp \
+    comment "IMAPS - DNAT redirige a Dovecot en SERVIDOR_SERVICIOS"
+
+sudo ufw allow in on "${IFACE_VPN}" \
     to any port 587 proto tcp \
     comment "SMTP submission"
 
