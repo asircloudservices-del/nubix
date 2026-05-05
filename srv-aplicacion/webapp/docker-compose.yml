@@ -1,0 +1,55 @@
+version: "3.8"
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: nubix-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root1234
+      MYSQL_DATABASE: nubix
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./mariadb/init:/docker-entrypoint-initdb.d
+    # Este parámetro expondrá el puerto 3306 y lo hará accesible desde cualquier host que se conecte al puerto 3306 del host anfitrión.
+    # De esta manera podemos hacer que Ansible y el servidor de aplicación puedan acceder a la BD.
+    ports:
+      - "3306:3306"
+    networks:
+      - hosting_net
+
+  webapp:
+    image: nubixuser/webapp:latest
+    # build: ./webapp
+    container_name: nubix-webapp
+    restart: always
+    depends_on:
+      - db
+    volumes:
+      - ./html:/var/www/html
+      # Para la clave SSH
+      - /home/ansible/ansible-bridge/ssh:/var/www/ansible-ssh
+      # Para los logs relacionados con Ansible
+      - /var/log/ansible-bridge:/var/log/ansible-bridge
+
+    environment:
+      DB_HOST: db
+      DB_NAME: nubix
+      DB_USER: phpAdmin
+      DB_PASSWORD: php1234
+    # Agrega entradas al /etc/hosts del contenedor.
+    # Donde "host-gateway" es la IP del host vista desde la red Docker.
+    # Esto lo hacemos para que PHP pueda conectarse vía SSH al host y así ejecutar Ansible.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - hosting_net
+    ports:
+      - "80:80"
+
+networks:
+  hosting_net:
+    driver: bridge
+
+volumes:
+  db_data:

@@ -1,0 +1,26 @@
+# vars/global.yml
+---
+# Rutas importantes del servidor de hosting:
+bind_zones_dir: /etc/bind/zones
+bind_conf_local: /etc/bind/named.conf.local
+nginx_sites_dir: /etc/nginx/sites-available
+nginx_enabled_dir: /etc/nginx/sites-enabled
+wordpress_base: /opt/wordpress-base
+wordpress_web_dir: /var/www/wordpress
+mail_vhosts_dir: /var/mail/vhosts
+
+# Parámetros de la base de datos:
+db_host: 10.10.10.12
+db_nombre: nubix
+db_usuario: ansibleAdmin
+db_password: ansible1234
+
+# Parámetros para la gestión del proxy inverso:
+npm_url: http://192.168.232.122:81
+npm_email: asircloudservices@gmail.com
+npm_password: npmadmin123
+
+# Parámetros de red:
+dominio_base: nubix.es
+ip_acceso: 192.168.232.122
+ip_hosting: 10.10.10.11

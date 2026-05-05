@@ -1,0 +1,141 @@
+---
+# Añade un registro A personalizado a la zona DNS de un dominio
+
+# Nombre informativo para el playbook:
+- name: Crear subdominio {{ subdominio }}.{{ dominio }}
+  # Hosts donde realizará las tareas definidas bajo "tasks"
+  hosts: hosting
+  # Si las acciones se ejecutarán como root o no (si es true, sí)
+  become: true
+  # Fichero de variables externas
+  vars_files:
+    - ../variables/global.yml
+
+  # Variables definidas dentro del playbook:
+  vars:
+    # Ruta al archivo de zona del dominio del usuario
+    zona_file: "{{ bind_zones_dir }}/{{ dominio }}.db"
+
+    # El registro A que añadiremos al archivo de zona. \t son tabulaciones.
+    registro_a: "{{ subdominio }}\tIN\tA\t{{ ip_destino }}"
+
+  # Se definen las tareas que hará el playbook:
+  tasks:
+    # 1. Verifica que el archivo de zona del dominio exista
+    - name: Comprobar que existe la zona del dominio
+      # Comprueba si un fichero o ruta existe, y su contenido lo guarda en una nueva variable definida en "register"
+      stat:
+        path: "{{ zona_file }}"
+      register: zona_stat
+
+    - name: Abortar si la zona no existe
+      # El playbook fallará cuando la condición en "when" sea verdadera
+      fail:
+        msg: >
+          No existe el archivo de zona para {{ dominio }}.
+          Asegúrate de que el dominio fue creado correctamente.
+      # Si la variable zona_star definida dentro de stat no existe...
+      when: not zona_stat.stat.exists
+
+    # 2. Comprobar si el registro DNS introducido ya existe en el fichero de zona:
+    - name: Comprobar si el subdominio ya tiene un registro
+      # Se ejecuta el comando y se guarda su salida (éxito o error) en la variable "registro_existente"
+      command: >
+        grep -E "^{{ subdominio }}\s+IN\s+A\s+" {{ zona_file }}
+      register: registro_existente
+      # Define cuándo se producen fallos. Por defecto si el comando grep devuelve que no ha encontrado nada, se consideraría como fallo.
+      # No es un fallo ya que buscamos que el registro DNS no exista para poder introducirlo.
+      # Para evitar que Ansible lo interprete como un fallo del playbook, se fija el valor a false.
+      failed_when: false
+      changed_when: false
+
+    - name: Abortar si el subdominio ya existe en la zona
+      # Falla cuando la variable registro_existente definida antes devuelve 0 (es decir, grep detecta que ya existe el registro en la zona).
+      fail:
+        msg: "El subdominio {{ subdominio }}.{{ dominio }} ya tiene un registro A."
+      when: registro_existente.rc == 0
+
+    # 3. Actualizar el serial de la zona
+    # El serial debe incrementarse cada vez que se modifica la zona para que los clientes DNS sepan que hay cambios
+    # Usamos el formato YYYYMMDDnn donde nn es el número de revisión del día
+    - name: Extraer la sección del SOA
+      # El siguiente comando extrae la línea del SOA, donde se encuentran parámetros como el serial y el TTL
+      command: >
+        awk '/SOA/{flag=1} flag{print} /\)/{flag=0}' {{ zona_file }}
+      register: soa_section
+      changed_when: false
+      failed_when: soa_section.rc != 0
+
+    - name: Extraemos el serial incluido dentro del SOA
+      # Se crea la variable de Ansible serial_actual
+      set_fact:
+        # Del soa, se encargará de extraer un valor numérico que contenga un total de diez números.
+        serial_actual: "{{ soa_section.stdout | regex_search('[0-9]{10}') }}"
+      failed_when: serial_actual is not defined
+
+    - name: Separar fecha y número de revisión del serial
+      set_fact:
+        # Extrae del dígito 0 al 8 del serial, es decir la parte que tiene formato YYYYMMDD
+        serial_fecha: "{{ serial_actual[0:8] }}"
+        # Extrae el número de revisión que cambia si se hacen varias modificaciones en un mismo día
+        serial_revision: "{{ serial_actual[8:10] | int }}"
+
+    - name: Asignar fecha actual
+      set_fact:
+        fecha_actual: "{{ ansible_date_time.date | replace('-', '') }}"
+
+    - name: Asignar nuevo serial
+      set_fact:
+        serial_nuevo: >-
+          {{
+            fecha_actual +
+            (
+              '%02d' | format((serial_revision|int) + 1)
+              if fecha_actual == serial_fecha
+              else '01'
+            )
+          }}
+
+    - name: Aplicar nuevo serial en el fichero de zona
+      replace:
+        path: "{{ zona_file }}"
+        regexp: "{{ serial_actual }}"
+        replace: "{{ serial_nuevo }}"
+
+    # 4. Añadir el registro al archivo de zona
+    # Insertamos el nuevo registro antes de la última línea vacía
+    - name: Añadir registro A para el subdominio
+      lineinfile:
+        path: "{{ zona_file }}"
+        line: "{{ registro_a }}"
+        # Insertar después de la última línea:
+        insertafter: EOF
+        state: present
+
+    # 5. Verificar la zona con named_checkzone
+    - name: Verificar sintaxis del archivo de zona
+      command: >
+        named-checkzone {{ dominio }} {{ zona_file }}
+      register: check_zone
+      changed_when: false
+      failed_when: check_zone.rc != 0
+
+    # 6. Recargar BIND9 para aplicar los cambios
+    - name: Recargar BIND9
+      # Comando de BIND para recargar las configuraciones
+      command: rndc reload
+      changed_when: false
+
+    # 7. Consultamos al DNS por el nuevo subdominio
+    - name: Verificar resolución del subdominio
+      command: >
+        dig @127.0.0.1 {{ subdominio }}.{{ dominio }} A +short
+      register: dig_result
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar resultado de la resolución
+      debug:
+        msg: >
+          Subdominio {{ subdominio }}.{{ dominio }} →
+          {{ dig_result.stdout | default('(pendiente de propagación)') }}

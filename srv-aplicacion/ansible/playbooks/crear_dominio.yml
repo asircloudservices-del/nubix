@@ -1,0 +1,131 @@
+---
+# Se encarga de crear el dominio para el usuario
+
+# Nombre informativo para el playbook
+- name: Crear dominio en BIND9 y proxy inverso
+  # Equipos definidos en el fichero se inventario en los que realizará las acciones
+  hosts: hosting
+  # Se realizan las tareas como root
+  become: true
+  # Fichero de variables externo
+  vars_files:
+    - ../variables/global.yml
+
+  tasks:
+    # 1. Comprobar si el dominio ya existe en BIND9
+    - name: Comprobar si la zona ya existe
+      # Se comprueba si existe la ruta del fichero y se guarda el resultado en "zona_existente"
+      stat:
+        path: "{{ bind_zones_dir }}/{{ dominio }}.db"
+      register: zona_existente
+
+    - name: Abortar si el dominio ya existe
+      # Error si se cumple la condición del when. La condición indica que la variable definida dentro de stat existe (en otras palabras, que ya exista la zona)
+      fail:
+        msg: "El dominio {{ dominio }} ya tiene una zona en BIND9."
+      when: zona_existente.stat.exists
+
+    # 2. Crear archivo de zona
+    - name: Crear archivo de zona para {{ dominio }}
+      # Copia el contenido definido en content a la ruta de destino. Se incluyen los permisos y propietarios
+      copy:
+        dest: "{{ bind_zones_dir }}/{{ dominio }}.db"
+        owner: bind
+        group: bind
+        mode: "0644"
+        content: |
+          ; Zona: {{ dominio }}
+          $TTL 86400
+          @   IN  SOA  dns.{{ dominio_base }}. admin.{{ dominio_base }}. (
+                          {{ ansible_date_time.year }}{{ '%02d' % ansible_date_time.month|int }}{{ '%02d' % ansible_date_time.day|int }}01 ; serial
+                          3600
+                          1800
+                          604800
+                          86400 )
+
+          @       IN  NS   dns.{{ dominio_base }}.
+          @       IN  A    {{ ip_acceso }}
+          www     IN  A    {{ ip_acceso }}
+          @  IN  MX 10  mail.{{ dominio_base }}.
+
+    # 3. Añadir zona a named.conf.local
+    - name: Añadir entrada en named.conf.local
+      # Sirve para editar un fichero por bloques
+      blockinfile:
+        path: "{{ bind_conf_local }}"
+        # Definimos un marcador que se pondrá al inicio y al final del bloque. De esta manera separamos las zonas visualmente.
+        marker: "# {mark} ZONA {{ dominio }}"
+        # Aquí se agrega el texto que queramos añadir al final del fichero
+        block: |
+          zone "{{ dominio }}" {
+              type master;
+              file "{{ bind_zones_dir }}/{{ dominio }}.db";
+              allow-update { none; };
+          };
+
+    # 4. Verificar configuraciones
+    - name: Verificar named.conf
+      command: named-checkconf
+      changed_when: false
+
+    - name: Verificar fichero de la zona {{ dominio }}
+      command: >
+        named-checkzone {{ dominio }}
+        {{ bind_zones_dir }}/{{ dominio }}.db
+      changed_when: false
+
+    # 5. Recargar BIND9
+    - name: Recargar BIND9
+      # Es un comando propio de BIND que permite recargar las condiguraciones sin reiniciar el servicio
+      command: rndc reload
+      notify: Confirmar recarga BIND9
+
+  handlers:
+    - name: Confirmar recarga BIND9
+      debug:
+        msg: "BIND9 recargado correctamente para {{ dominio }}"
+
+# Crear regla en el proxy inverso para WordPress
+- name: Crear proxy NPM para futuro WordPress
+  # Se hace desde el mismo equipo del playbook ya que no necesitamos conexión remota
+  hosts: localhost
+  connection: local
+  vars_files:
+    - ../variables/global.yml
+
+  tasks:
+    # La siguiente tarea se encarga de autenticarse contra la API para recibir un token
+    - name: Obtener token para acceder a gestionar el proxy inverso
+      uri:
+        url: "{{ npm_url }}/api/tokens"
+        method: POST
+        body_format: json
+        body:
+          identity: "{{ npm_email }}"
+          secret: "{{ npm_password }}"
+        status_code: 200
+      register: npm_auth
+
+    - name: Crear proxy host en NPM
+      uri:
+        url: "{{ npm_url }}/api/nginx/proxy-hosts"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ npm_auth.json.token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          domain_names:
+            - "{{ dominio }}"
+          forward_host: "{{ ip_hosting }}"
+          forward_port: 80
+          forward_scheme: http
+          certificate_id: 1
+          ssl_forced: 1
+          caching_enabled: 0
+          block_exploits: 1
+          http2_support: 1
+          enabled: 1
+          hsts_enabled: 1
+        status_code: 201
+      register: npm_proxy

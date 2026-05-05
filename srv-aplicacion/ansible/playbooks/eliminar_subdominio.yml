@@ -1,0 +1,133 @@
+---
+# eliminar_subdominio.yml
+# Elimina un registro A personalizado de la zona DNS de un dominio
+#
+# Variables requeridas (desde PHP via --extra-vars):
+#   dominio     → nombre completo del dominio, ej: pepito.es
+#   subdominio  → nombre corto del subdominio, ej: memoria
+
+# Nombre informativo para el playbook
+- name: Eliminar subdominio {{ subdominio }}.{{ dominio }}
+  # Hosts donde se realizarán las acciones
+  hosts: hosting
+  # Se realiza con root
+  become: true
+  # Fichero externo de variables:
+  vars_files:
+    - ../variables/global.yml
+
+  # Variables incluidas en el playbook
+  vars:
+    # Ruta al archivo de zona del dominio del usuario
+    zona_file: "{{ bind_zones_dir }}/{{ dominio }}.db"
+
+  tasks:
+    # 1. Verificar que el archivo de zona existe
+    - name: Comprobar que existe la zona del dominio
+      stat:
+        path: "{{ zona_file }}"
+      register: zona_stat
+
+    - name: Abortar si la zona no existe
+      fail:
+        msg: "No existe el archivo de zona para {{ dominio }}."
+      when: not zona_stat.stat.exists
+
+    # 2. Comprobar que el registro existe antes de borrarlo
+    - name: Comprobar si el subdominio tiene registro A
+      command: >
+        grep -E "^{{ subdominio }}\s+IN\s+A\s+" {{ zona_file }}
+      register: registro_existente
+      failed_when: false
+      changed_when: false
+
+    - name: Informar si el registro no existe (no es error crítico)
+      debug:
+        msg: >
+          El registro A para {{ subdominio }}.{{ dominio }} no fue encontrado
+          en el archivo de zona. Puede que ya fuera eliminado.
+      when: registro_existente.rc != 0
+
+    # 3. Actualizar el serial de la zona
+    # El serial debe incrementarse cada vez que se modifica la zona para que los clientes DNS sepan que hay cambios
+    # Usamos el formato YYYYMMDDnn donde nn es el número de revisión del día
+    - name: Extraer la sección del SOA
+      # El siguiente comando extrae la línea del SOA, donde se encuentran parámetros como el serial y el TTL
+      command: >
+        awk '/SOA/{flag=1} flag{print} /\)/{flag=0}' {{ zona_file }}
+      register: soa_section
+      changed_when: false
+      failed_when: soa_section.rc != 0
+
+    - name: Extraemos el serial incluido dentro del SOA
+      # Se crea la variable de Ansible serial_actual
+      set_fact:
+        # Del soa, se encargará de extraer un valor numérico que contenga un total de diez números.
+        serial_actual: "{{ soa_section.stdout | regex_search('[0-9]{10}') }}"
+      failed_when: serial_actual is not defined
+
+    - name: Separar fecha y número de revisión del serial
+      set_fact:
+        # Extrae del dígito 0 al 8 del serial, es decir la parte que tiene formato YYYYMMDD
+        serial_fecha: "{{ serial_actual[0:8] }}"
+        # Extrae el número de revisión que cambia si se hacen varias modificaciones en un mismo día
+        serial_revision: "{{ serial_actual[8:10] | int }}"
+
+    - name: Asignar fecha actual
+      set_fact:
+        fecha_actual: "{{ ansible_date_time.date | replace('-', '') }}"
+
+    - name: Asignar nuevo serial
+      set_fact:
+        serial_nuevo: >-
+          {{
+            fecha_actual +
+            (
+              '%02d' | format((serial_revision|int) + 1)
+              if fecha_actual == serial_fecha
+              else '01'
+            )
+          }}
+
+    - name: Aplicar nuevo serial en el fichero de zona
+      replace:
+        path: "{{ zona_file }}"
+        regexp: "{{ serial_actual }}"
+        replace: "{{ serial_nuevo }}"
+
+    # 4. Eliminar el registro A del archivo de zona
+    - name: Eliminar registro A del subdominio
+      lineinfile:
+        path: "{{ zona_file }}"
+        # Expresión regular que coincide con el registro A del subdominio
+        regexp: "^{{ subdominio }}\\s+IN\\s+A\\s+.*$"
+        # Elimina todas las coincidencias
+        state: absent
+      when: registro_existente.rc == 0
+
+    # 5. Verificar la zona con named_checkconf
+    - name: Verificar sintaxis del archivo de zona
+      command: >
+        named-checkzone {{ dominio }} {{ zona_file }}
+      register: check_zone
+      changed_when: false
+      failed_when: check_zone.rc != 0
+
+    # 6. Recargar BIND9
+    - name: Recargar BIND9
+      command: rndc reload
+      changed_when: false
+
+    # 7. Verificar que al consultar al DNS ya no resuelve el registro
+    - name: Verificar que el subdominio ya no resuelve
+      command: >
+        dig @127.0.0.1 {{ subdominio }}.{{ dominio }} A +short
+      register: dig_result
+      changed_when: false
+      failed_when: false
+
+    - name: Mostrar resultado de la verificación
+      debug:
+        msg: >
+          Subdominio {{ subdominio }}.{{ dominio }} eliminado.
+          dig devuelve: '{{ dig_result.stdout | default("(vacío - correcto)") }}

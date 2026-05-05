@@ -1,0 +1,90 @@
+---
+# Configura el correo del usuario en los servicios de correo y crea el registro en la BD
+
+# Nombre informativo para el playbook
+- name: Crear cuenta de correo
+  # Hosts remotos en los que se realizna las operaciones
+  hosts: hosting
+  # Se realizan los comandos como usuario root
+  become: true
+  # Fichero externo de variables
+  vars_files:
+    - ../variables/global.yml
+
+  tasks:
+    # 1. Generar hash de contraseña con doveadm
+    - name: Generar hash SHA512-CRYPT
+      command: >
+        doveadm pw -s SHA512-CRYPT -p {{ password_correo }}
+      register: hash_resultado
+      # No se muestran logs para evitar que se vea la contraseña
+      no_log: true
+
+    - name: Guardar hash
+      set_fact:
+        password_hash: "{{ hash_resultado.stdout }}"
+      no_log: true
+
+    # 2. Crear directorio del buzón
+    - name: Crear directorio del buzón
+      # Nos permite realizar acciones con ficheros. En este caso, se crea un directorio y se asignan los permisos y propietarios
+      file:
+        path: "{{ mail_vhosts_dir }}/{{ dominio }}/{{ usuario_correo }}"
+        state: directory
+        owner: vmail
+        group: vmail
+        mode: "0700"
+        recurse: true
+
+    # 3. Registrar dominio de correo en BD si no existe
+    - name: Insertar dominio de correo en BD central
+      # Si instalamos el módulo MySQL, podemos hacer que Ansible haga conexiones a la BD
+      community.mysql.mysql_query:
+        login_host: "{{ db_host }}"
+        login_db: "{{ db_nombre }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        query: >
+          INSERT IGNORE INTO dominios_correo (dominio_id, dominio)
+          SELECT id, %s FROM dominios
+          WHERE dominio = %s AND estado = 'activo'
+        positional_args:
+          - "{{ dominio }}"
+          - "{{ dominio }}"
+
+    # 4. Insertar cuenta en BD central
+    - name: Insertar cuenta de correo en BD central
+      community.mysql.mysql_query:
+        login_host: "{{ db_host }}"
+        login_db: "{{ db_nombre }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        query: >
+          INSERT INTO cuentas_correo
+            (dominio_id, usuario, dominio, password, buzon)
+          SELECT d.id, %s, %s, %s, %s
+          FROM dominios d
+          WHERE d.dominio = %s AND d.estado = 'activo'
+        positional_args:
+          - "{{ usuario_correo }}"
+          - "{{ dominio }}"
+          - "{{ password_hash }}"
+          - "{{ dominio }}/{{ usuario_correo }}/"
+          - "{{ dominio }}"
+      no_log: true
+
+    # 5. Verificar que Postfix puede ver el buzón
+    - name: Verificar consulta Postfix
+      # El siguiente comando hará que postfix consulte por el usuario de correo a la base de datos
+      command: >
+        postmap -q {{ usuario_correo }}@{{ dominio }}
+        mysql:/etc/postfix/mysql/virtual-mailbox-maps.cf
+      register: postmap_result
+      failed_when: postmap_result.rc not in [0, 1]
+      changed_when: false
+
+    - name: Confirmar resultado
+      debug:
+        msg: >
+          Correo {{ usuario_correo }}@{{ dominio }} creado.
+          Postmap devuelve: {{ postmap_result.stdout | default('(vacío - normal si BD aún propaga)') }}

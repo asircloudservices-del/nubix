@@ -1,0 +1,189 @@
+---
+# Se encarga de realizar todas las acciones necesarias para eliminar completamente el dominio de un usuario
+
+# Nombre informativo del playbook
+- name: Eliminar dominio y todos sus servicios
+  # Hosts remotos en los que se realizan las acciones
+  hosts: hosting
+  # Se realizan con el usuario root
+  become: true
+  # Fichero externo de variables
+  vars_files:
+    - ../variables/global.yml
+
+  tasks:
+    # 1. Eliminar WordPress si existe
+    - name: Comprobar si existe WordPress
+      stat:
+        path: "{{ wordpress_web_dir }}/{{ dominio }}"
+      register: wp_dir_stat
+
+    - name: Eliminar directorio de WordPress
+      # Si la variable del directorio de WP existe, se borra el directorio del dominio (contiene su WP)
+      file:
+        path: "{{ wordpress_web_dir }}/{{ dominio }}"
+        state: absent
+      when: wp_dir_stat.stat.exists
+
+    - name: Eliminar virtualhost Nginx (link)
+      # Elimina el enlace simbólico del sitio en sites-enabled
+      file:
+        path: "{{ nginx_enabled_dir }}/{{ dominio }}.conf"
+        state: absent
+
+    - name: Eliminar virtualhost Nginx (archivo)
+      # Elimina el fichero de configuración del sitio
+      file:
+        path: "{{ nginx_sites_dir }}/{{ dominio }}.conf"
+        state: absent
+
+    - name: Recargar Nginx si existía WordPress
+      service:
+        name: nginx
+        state: reloaded
+      when: wp_dir_stat.stat.exists
+
+    # 2. Eliminar buzones de correo
+    - name: Comprobar si existe directorio de correo
+      stat:
+        path: "{{ mail_vhosts_dir }}/{{ dominio }}"
+      register: mail_dir_stat
+
+    - name: Eliminar buzones del dominio
+      file:
+        path: "{{ mail_vhosts_dir }}/{{ dominio }}"
+        state: absent
+      when: mail_dir_stat.stat.exists
+
+    # 3. Eliminar zona DNS de BIND9
+    - name: Eliminar archivo de zona
+      file:
+        path: "{{ bind_zones_dir }}/{{ dominio }}.db"
+        state: absent
+
+    - name: Eliminar entrada en named.conf.local
+      # Los siguientes parámetros buscan unas líneas comentadas para borrar todo lo que hay entre ellas.
+      # Estas líneas se crean automáticamente por el playbook que crea el dominio del usuario
+      blockinfile:
+        path: "{{ bind_conf_local }}"
+        marker: "# {mark} ZONA {{ dominio }}"
+        state: absent
+
+    - name: Recargar BIND9
+      command: rndc reload
+      changed_when: false
+
+    # 4. Eliminar BD de WordPress en el servidor de aplicación
+    - name: Obtener datos del WordPress desde BD central
+      # Gracias a la colección, podemos realizar la conexión a la BD y la consulta para obtener los datos
+      community.mysql.mysql_query:
+        login_host: "{{ db_host }}"
+        login_db: "{{ db_nombre }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        query: >
+          SELECT db_nombre, db_usuario FROM wordpress_sites
+          WHERE dominio = %s AND estado != 'eliminado'
+        positional_args:
+          - "{{ dominio }}"
+      register: wp_datos
+
+    - name: Eliminar base de datos de WordPress
+      community.mysql.mysql_db:
+        login_host: "{{ db_host }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        # La acción de borrado se aplica a la base de datos, cuyo nombre obtenemos del resultado de la consulta anterior
+        name: "{{ wp_datos.query_result[0][0].db_nombre }}"
+        state: absent
+      when: wp_datos.query_result[0] | length > 0
+
+    - name: Eliminar usuario de BD de WordPress
+      community.mysql.mysql_user:
+        login_host: "{{ db_host }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        # La acción se aplica al usuario, cuyo valor hemos sacado de la consulta guardada en la variable wp_datos
+        name: "{{ wp_datos.query_result[0][0].db_usuario }}"
+        host: "{{ ip_hosting }}"
+        state: absent
+      when: wp_datos.query_result[0] | length > 0
+
+    # 5. Marcar como eliminado en BD central
+    - name: Marcar correos como inactivos en BD central
+      community.mysql.mysql_query:
+        login_host: "{{ db_host }}"
+        login_db: "{{ db_nombre }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        # Marcamos el dominio en la tabla de correos como inactivo (activo=0)
+        query: >
+          UPDATE cuentas_correo cc
+          JOIN dominios d ON cc.dominio_id = d.id
+          SET cc.activo = 0
+          WHERE d.dominio = %s
+        positional_args:
+          - "{{ dominio }}"
+
+    - name: Marcar WordPress como eliminado en BD central
+      community.mysql.mysql_query:
+        login_host: "{{ db_host }}"
+        login_db: "{{ db_nombre }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        # Actualizamos el registro del sitio y lo marcamos como eliminado (estado=eliminado)
+        query: >
+          UPDATE wordpress_sites SET estado = 'eliminado'
+          WHERE dominio = %s
+        positional_args:
+          - "{{ dominio }}"
+
+# Eliminar regla de NPM
+- name: Eliminar proxy NPM
+  hosts: localhost
+  connection: local
+  vars_files:
+    - ../variables/global.yml
+
+  # Realizaremos las acciones vía API
+  tasks:
+    # La siguiente tarea se encarga de autenticarse contra la API para recibir un token
+    - name: Obtener token para acceder a gestionar el proxy inverso
+      uri:
+        url: "{{ npm_url }}/api/tokens"
+        method: POST
+        body_format: json
+        body:
+          identity: "{{ npm_email }}"
+          secret: "{{ npm_password }}"
+        status_code: 200
+      register: npm_auth
+
+    - name: Listar proxy hosts
+      # La petición GET a la URL de proxy-host nos devolverá los proxy-hosts configurados
+      uri:
+        url: "{{ npm_url }}/api/nginx/proxy-hosts"
+        method: GET
+        headers:
+          Authorization: "Bearer {{ npm_auth.json.token }}"
+      register: proxy_list
+
+    - name: Buscar proxy host del dominio
+      # Dentro de los proxys, filtramos con selectattr para obtener sólo aquellos objetos que contengan el dominio del usuario (en principio sólo debería de haber uno)
+      set_fact:
+        proxy_obj: >-
+          {{
+            proxy_list.json
+            | selectattr('domain_names', 'contains', dominio)
+            | list
+            | first
+          }}
+
+    - name: Eliminar regla de proxy host
+      # Mandamos una petición DELETE a la API indicando el ID del proxy a eliminar en la URL
+      uri:
+        url: "{{ npm_url }}/api/nginx/proxy-hosts/{{ proxy_obj.id }}"
+        method: DELETE
+        headers:
+          Authorization: "Bearer {{ npm_auth.json.token }}"
+      when: proxy_obj is defined

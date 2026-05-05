@@ -1,0 +1,179 @@
+---
+# Se encarga de desplegar la plantilla de WordPress para un usuario específico
+
+# Nombre informativo para el playbook
+- name: Desplegar WordPress para {{ dominio }}
+  # Hosts remotos donde se realizarán las operaciones
+  hosts: hosting
+  # Se realizarán las tareas con root
+  become: true
+  # Fichero externo de variables
+  vars_files:
+    - ../variables/global.yml
+
+  vars:
+    wp_dir: "{{ wordpress_web_dir }}/{{ dominio }}"
+    wp_db_nombre: "wp_{{ dominio | replace('.', '_') }}"
+    wp_db_user: "wpuser_{{ dominio | replace('.', '_') }}"
+
+  tasks:
+    # 1. Comprobar si el dominio ya tiene WP
+    - name: Comprobar si el directorio ya existe
+      stat:
+        path: "{{ wp_dir }}"
+      register: wp_existente
+
+    - name: Abortar si WordPress ya existe para el dominio
+      fail:
+        msg: "Ya existe WordPress en {{ wp_dir }}"
+      when: wp_existente.stat.exists
+
+    # 2. Copiar WordPress base
+    - name: Copiar WordPress base al directorio del dominio
+      # El siguiente comando copia el origen en el destino, y asigna los permisos definidos a la copia
+      shell: |
+        cp -r {{ wordpress_base }} {{ wp_dir }}/
+        chown -R www-data:www-data {{ wp_dir }}
+
+    # 3. Crear base de datos en el servidor de aplicación
+    - name: Crear base de datos de WordPress
+      # Con la colección MySQL, Ansible puede conectarse al gestor y crear la BD
+      community.mysql.mysql_db:
+        login_host: "{{ db_host }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        name: "{{ wp_db_nombre }}"
+        state: present
+        encoding: utf8mb4
+        collation: utf8mb4_unicode_ci
+
+    # Crea el usuario para la BD de WP
+    - name: Crear usuario de BD para WordPress
+      community.mysql.mysql_user:
+        login_host: "{{ db_host }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        name: "{{ wp_db_user }}"
+        host: "{{ ip_hosting }}"
+        password: "{{ wp_password }}"
+        priv: "{{ wp_db_nombre }}.*:ALL"
+        state: present
+      #no_log: true
+
+    # 4. Generar wp-config.php personalizado
+    - name: Crear wp-config.php
+      # Los siguientes parámetros copian el contenido de content al fichero especificado como destino, además de asignar permisos específicos
+      copy:
+        dest: "{{ wp_dir }}/wp-config.php"
+        owner: www-data
+        group: www-data
+        mode: "0640"
+        content: |
+          <?php
+          define('DB_NAME',     '{{ wp_db_nombre }}');
+          define('DB_USER',     '{{ wp_db_user }}');
+          define('DB_PASSWORD', '{{ wp_password }}');
+          define('DB_HOST',     '{{ db_host }}');
+          define('DB_CHARSET',  'utf8mb4');
+          define('DB_COLLATE',  '');
+
+          define('AUTH_KEY',         '{{ lookup("password", "/dev/null length=64") }}');
+          define('SECURE_AUTH_KEY',  '{{ lookup("password", "/dev/null length=64") }}');
+          define('LOGGED_IN_KEY',    '{{ lookup("password", "/dev/null length=64") }}');
+          define('NONCE_KEY',        '{{ lookup("password", "/dev/null length=64") }}');
+          define('AUTH_SALT',        '{{ lookup("password", "/dev/null length=64") }}');
+          define('SECURE_AUTH_SALT', '{{ lookup("password", "/dev/null length=64") }}');
+          define('LOGGED_IN_SALT',   '{{ lookup("password", "/dev/null length=64") }}');
+          define('NONCE_SALT',       '{{ lookup("password", "/dev/null length=64") }}');
+
+          $table_prefix = 'wp_';
+
+          define('WP_DEBUG', false);
+
+          if ( ! defined( 'ABSPATH' ) ) {
+              define( 'ABSPATH', __DIR__ . '/' );
+          }
+          require_once ABSPATH . 'wp-settings.php';
+      no_log: true
+
+    # 5. Crear virtualhost para el dominio
+    - name: Crear virtualhost Nginx para {{ dominio }}
+      copy:
+        dest: "{{ nginx_sites_dir }}/{{ dominio }}.conf"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          server {
+            listen 80;
+            server_name {{ dominio }};
+
+            root /var/www/wordpress/{{ dominio }};
+            index index.php index.html;
+
+            access_log /var/log/nginx/{{ dominio }}-access.log;
+            error_log  /var/log/nginx/{{ dominio }}-error.log;
+
+            client_max_body_size 64M;
+
+            location / {
+                try_files $uri $uri/ /index.php?$args;
+            }
+
+            location ~ \.php$ {
+                include        snippets/fastcgi-php.conf;
+                fastcgi_pass   unix:/run/php/php8.3-fpm.sock;
+                fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                include        fastcgi_params;
+            }
+
+            location ~ /\.ht {
+                deny all;
+            }
+
+            location = /favicon.ico { log_not_found off; access_log off; }
+            location = /robots.txt  { log_not_found off; access_log off; }
+
+            location ~* \.(css|gif|ico|jpeg|jpg|js|png)$ {
+                expires max;
+                log_not_found off;
+            }
+          }
+
+    - name: Activar virtualhost
+      # Crea el enlace simbólico en sites_enabled para que se active el sitio
+      file:
+        src: "{{ nginx_sites_dir }}/{{ dominio }}.conf"
+        dest: "{{ nginx_enabled_dir }}/{{ dominio }}.conf"
+        state: link
+
+    - name: Verificar configuración Nginx
+      command: nginx -t
+      changed_when: false
+
+    - name: Recargar Nginx
+      service:
+        name: nginx
+        state: reloaded
+
+    # 6. Registrar en BD central
+    - name: Registrar WordPress en BD central
+      # Añade en la BD un registro que indica que su sitio de WP está creado y activo
+      community.mysql.mysql_query:
+        login_host: "{{ db_host }}"
+        login_db: "{{ db_nombre }}"
+        login_user: "{{ db_usuario }}"
+        login_password: "{{ db_password }}"
+        query: >
+          INSERT INTO wordpress_sites
+            (dominio_id, dominio, db_nombre, db_usuario, db_password, estado)
+          SELECT d.id, %s, %s, %s, %s, 'activo'
+          FROM dominios d
+          WHERE d.dominio = %s AND d.estado = 'activo'
+        positional_args:
+          - "{{ dominio }}"
+          - "{{ wp_db_nombre }}"
+          - "{{ wp_db_user }}"
+          - "{{ wp_password }}"
+          - "{{ dominio }}"
+      no_log: true

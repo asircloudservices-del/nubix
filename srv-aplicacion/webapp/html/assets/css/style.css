@@ -1,0 +1,1162 @@
+/* Estilos de Nubix Hosting:
+     0. Implementación de la fuente
+     1.  Reset y variables CSS
+     2.  Página de autenticación (login/registro)
+     3.  Formularios
+     4.  Botones
+     5.  Alertas
+     6.  Dashboard y navbar
+     7.  Tarjetas (cards)
+     8.  Tabla
+     9.  Dominio (input row, preview, selector TLD)
+     10. Correo
+     11. WordPress
+     12. Utilidades
+     13. Animaciones
+     14. Sección de registros DNS
+     15. Implementa modo oscuro
+     16. Estilos de página de inicio.php
+     17. Estilos para la sección "Guía de configuración de Thunderbird"
+     18. Estilos banner
+*/
+
+/* ── 0. Importación de fuente Raleway ──────────────────────── */
+
+/* Importar la fuente */
+@import url("https://fonts.googleapis.com/css2?family=Raleway:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
+
+/* Cambia la fuente de todo el sitio */
+:root {
+    --font: "Raleway", sans-serif;
+}
+
+/* Forzar la fuente */
+*,
+*::before,
+*::after {
+    font-family: var(--font) !important;
+}
+
+/* 1. Reset y variables CSS*/
+
+/* Eliminamos márgenes y paddings del navegador
+   box-sizing: border-box incluye padding y border en el tamaño total */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* Variables globales. Cambiarlas modificará los estilos de la página */
+:root {
+    --primary: #2563eb; /* Principal */
+    --primary-dk: #1d4ed8; /* Hover */
+    --danger: #dc2626; /* Aciones destructivas */
+    --success: #16a34a; /* Mensajes de éxito */
+    --warning: #d97706; /* A#42445Advertencias */
+    --bg: #f1f5f9; /* Fondo general */
+    --card-bg: #ffffff; /* Fondo de tarjetas */
+    --text: #1e293b; /* Texto principal */
+    --muted: #64748b; /* Texto secundario */
+    --border: #e2e8f0; /* Bordes y separadores */
+    --radius: 8px; /* Esquinas redondeadas */
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Fuente del sistema para mayor velocidad de carga */
+body {
+    font-family:
+        system-ui,
+        -apple-system,
+        sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+}
+
+/* 2. Página de autenticación */
+
+/* Centra el formulario en toda la pantalla */
+.auth-page {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+}
+
+/* Caja del formulario */
+.auth-container {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 2.5rem;
+    width: 100%;
+    max-width: 440px;
+}
+
+/* Cabecera con nombre y descripción */
+.auth-logo {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+.auth-logo h1 {
+    font-size: 1.8rem;
+    color: var(--primary);
+}
+.auth-logo p {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 0.25rem;
+}
+
+/* Pestañas login / registro */
+.auth-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    border-bottom: 2px solid var(--border);
+}
+
+/* Cada pestaña individual */
+.auth-tabs .tab {
+    padding: 0.5rem 1rem;
+    text-decoration: none;
+    color: var(--muted);
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    transition:
+        color 0.2s,
+        border-color 0.2s;
+}
+
+/* Pestaña seleccionada */
+.auth-tabs .tab.active {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+/* 3. Formularios */
+
+/* Apila campos verticalmente */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* Cada campo con su label */
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+/* Labels */
+.form-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+/* Inputs de texto, email y password */
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"] {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    color: var(--text);
+    transition: border-color 0.2s;
+    width: 100%;
+}
+
+/* Resaltado al enfocar */
+.form-group input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Texto de ayuda bajo los campos */
+.form-hint {
+    color: var(--muted);
+    font-size: 0.8rem;
+}
+
+/* Descripción opcional bajo el título de sección */
+.card-desc {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+
+/* Fila de checkbox con su label */
+.form-check {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+.check-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text);
+}
+.check-label input[type="checkbox"] {
+    margin-top: 0.2rem;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+}
+
+/* 4. Botones */
+
+/* Base compartida por todos los botones */
+.btn {
+    display: inline-block;
+    padding: 0.6rem 1.2rem;
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition:
+        background 0.2s,
+        opacity 0.2s;
+    text-align: center;
+}
+/* Botón deshabilitado (tras envío de formulario) */
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Azul, ancho completo */
+.btn-primary {
+    background: var(--primary);
+    color: #fff;
+    width: 100%;
+}
+.btn-primary:hover {
+    background: var(--primary-dk);
+}
+
+/* Rojo, para eliminar */
+.btn-danger {
+    background: var(--danger);
+    color: #fff;
+}
+.btn-danger:hover {
+    opacity: 0.85;
+}
+
+/* Con borde, sin relleno */
+.btn-outline {
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    width: auto;
+}
+.btn-outline:hover {
+    background: #eff6ff;
+}
+
+/* Tamaño pequeño para navbar */
+.btn-sm {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8rem;
+    width: auto;
+}
+
+/* 5. Alertas */
+
+/* Base de todas las alertas */
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+/* Error */
+.alert-error {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fca5a5;
+}
+
+/* Éxito */
+.alert-success {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #86efac;
+}
+
+/* Alerta flotante en parte superior (para mensajes entre páginas) */
+.alert-flotante {
+    position: fixed;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    min-width: 320px;
+    max-width: 90vw;
+    box-shadow: var(--shadow);
+}
+
+/* Botón × de cierre generado por main.js */
+.alert-close {
+    background: none;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.alert-close:hover {
+    opacity: 1;
+}
+
+/* 6. Dashboard y navbar */
+
+/* Barra superior fija */
+.navbar {
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+.navbar-brand {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+.navbar-user {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    color: var(--muted);
+}
+
+/* Contenedor del dashboard */
+.dashboard-container {
+    max-width: 860px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* 7. Tarjetas (cards) */
+
+.card {
+    background: var(--card-bg);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+}
+.card h2 {
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+}
+.card-actions {
+    margin-top: 1rem;
+}
+
+/* Badge del dominio activo */
+.domain-badge {
+    display: inline-block;
+    background: #eff6ff;
+    color: var(--primary);
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Badge para direcciones de correo en la tabla */
+.correo-badge {
+    background: #f0fdf4;
+    color: var(--success);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+/* 8. Tabla */
+
+.tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+}
+.tabla th {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--border);
+    color: var(--muted);
+    font-weight: 600;
+}
+.tabla td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+}
+/* Hover sobre filas */
+.tabla tr:hover td {
+    background: #f8fafc;
+}
+
+/* 9. Dominio: input row, preview, TLD */
+
+/* Fila que agrupa SLD + separador + TLD */
+.domain-input-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+.domain-input-row input {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Punto o @ separador entre partes del dominio */
+.domain-dot {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--muted);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* Selector de TLD */
+.tld-select {
+    padding: 0.6rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 1rem;
+    color: var(--text);
+    background: var(--card-bg);
+    cursor: pointer;
+    transition: border-color 0.2s;
+    flex-shrink: 0;
+}
+.tld-select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Vista previa del dominio resultante */
+.domain-preview {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: #f8fafc;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 0.6rem 1rem;
+    margin-top: 0.25rem;
+}
+.domain-preview-label {
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+.domain-preview-value {
+    color: var(--primary);
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+/* 10. Correo */
+
+/* El sufijo @dominio mantiene su tamaño en pantallas pequeñas */
+.domain-input-row .domain-dot {
+    font-size: 0.9rem;
+}
+
+/* 11. WordPress */
+
+/* Caja informativa previa al formulario */
+.info-box {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    margin-bottom: 1.5rem;
+}
+.info-box h3 {
+    font-size: 0.95rem;
+    color: var(--primary);
+    margin-bottom: 0.5rem;
+}
+
+/* Lista de puntos informativos */
+.info-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+.info-list li {
+    font-size: 0.9rem;
+    color: var(--text);
+    padding-left: 1.2rem;
+    position: relative;
+}
+/* Flecha decorativa antes de cada ítem */
+.info-list li::before {
+    content: "→";
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+}
+
+/* 12. Utilidades */
+
+.text-muted {
+    color: var(--muted);
+}
+.text-success {
+    color: var(--success);
+}
+.text-danger {
+    color: var(--danger);
+}
+.text-sm {
+    font-size: 0.85rem;
+}
+.text-center {
+    text-align: center;
+}
+.mt-1 {
+    margin-top: 0.5rem;
+}
+.mt-2 {
+    margin-top: 1rem;
+}
+.mb-1 {
+    margin-bottom: 0.5rem;
+}
+.mb-2 {
+    margin-bottom: 1rem;
+}
+
+/* 13. Animaciones */
+
+/* Desvanecimiento de alertas de éxito */
+@keyframes fadeout {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+}
+.alert-fadeout {
+    animation: fadeout 0.5s ease forwards;
+}
+
+/* Aparición de alertas flotantes */
+@keyframes slidein {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -12px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+.alert-flotante {
+    animation: slidein 0.3s ease forwards;
+}
+
+/* ── 14. Sección de registros DNS ──────────────────────────── */
+
+.dns-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+.dns-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.dns-tabla {
+    margin-bottom: 0;
+}
+.dns-tabla .dns-arrow {
+    color: var(--muted);
+    text-align: center;
+    width: 2rem;
+    font-weight: 700;
+}
+.dns-fqdn {
+    font-family: monospace;
+    font-size: 0.95rem;
+}
+.dns-sub {
+    color: var(--primary);
+    font-weight: 700;
+}
+.dns-domain-suffix {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+.dns-ip {
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+.dns-actions {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.dns-row-new td {
+    background: #f8fafc;
+    border-top: 2px dashed var(--border);
+    padding-top: 0.75rem;
+}
+:root.dark .dns-row-new td {
+    background: #0f172a;
+}
+
+.dns-new-input {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.dns-input-sub,
+.dns-input-ip {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+    font-family: monospace;
+    color: var(--text);
+    background: var(--card-bg);
+}
+.dns-input-sub {
+    width: 120px;
+}
+.dns-input-ip {
+    width: 145px;
+}
+.dns-input-sub:focus,
+.dns-input-ip:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+:root.dark .dns-input-sub,
+:root.dark .dns-input-ip {
+    background: var(--card-bg);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+.btn-xs {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    width: auto;
+}
+
+.dns-contador {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+.dns-contador-agotado {
+    color: var(--danger);
+    font-weight: 500;
+}
+
+/* 15. Implementación del MODO OSCURO: */
+
+:root.dark {
+    --primary: #3b82f6; /* Azul más claro, mejor contraste en oscuro */
+    --primary-dk: #2563eb;
+    --bg: #0f172a; /* Fondo muy oscuro */
+    --card-bg: #1e293b; /* Tarjetas un tono más claro que el fondo */
+    --text: #f1f5f9; /* Texto claro */
+    --muted: #94a3b8; /* Texto secundario gris azulado */
+    --border: #334155; /* Bordes más oscuros */
+}
+
+/* Ajustes específicos que las variables no cubren */
+
+/* El fondo de las pestañas activas */
+:root.dark .auth-tabs .tab.active {
+    color: var(--primary);
+}
+
+/* El badge del dominio */
+:root.dark .domain-badge {
+    background: #1e3a5f;
+    color: var(--primary);
+}
+
+/* Caja de vista previa */
+:root.dark .domain-preview,
+:root.dark .email-preview {
+    background: #0f172a;
+    border-color: var(--border);
+}
+
+/* Filas de tabla en hover */
+:root.dark .tabla tr:hover td {
+    background: #263548;
+}
+
+/* Info box */
+:root.dark .info-box {
+    background: #1e3a5f;
+    border-color: #2563eb;
+}
+
+/* Warning box */
+:root.dark .warning-box {
+    background: #2d1f00;
+    border-color: #92400e;
+}
+:root.dark .warning-box h3 {
+    color: #fcd34d;
+}
+:root.dark .warning-box p {
+    color: #fde68a;
+}
+
+/* Inputs y selects */
+:root.dark .form-group input,
+:root.dark .tld-select {
+    background: var(--card-bg);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+/* Botón outline */
+:root.dark .btn-outline {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+/* Transición suave entre temas */
+body,
+.card,
+.navbar,
+.auth-container,
+.form-group input,
+.tld-select {
+    transition:
+        background-color 0.3s ease,
+        color 0.2s ease,
+        border-color 0.2s ease;
+}
+
+/* 16. Página de inicio (inicio.php) */
+
+/* Cuerpo de la página de inicio: sin padding ni márgenes extra */
+.inicio-page {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* Cabecera fija con logo y navegación */
+.inicio-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+/* Logo en la cabecera */
+.inicio-logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--primary);
+    letter-spacing: -0.02em;
+}
+
+/* Navegación derecha de la cabecera */
+.inicio-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+/* Saludo al usuario logueado en la nav */
+.inicio-nav-saludo {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+/* Separador visual entre saludo y botones */
+.inicio-nav-sep {
+    color: var(--border);
+    font-size: 1.2rem;
+}
+
+/* ── Banner principal ────────────────────────────────────────── */
+.inicio-banner {
+    background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
+    color: #fff;
+    padding: 6rem 2rem;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Contenido centrado dentro del banner */
+.inicio-banner-content {
+    max-width: 680px;
+}
+
+/* Título principal del banner */
+.inicio-banner-title {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+    letter-spacing: -0.03em;
+}
+
+/* Subtítulo descriptivo del banner */
+.inicio-banner-sub {
+    font-size: 1.2rem;
+    opacity: 0.88;
+    margin-bottom: 2rem;
+    line-height: 1.5;
+}
+
+/* Botón hero: versión grande para el banner principal */
+.btn-hero {
+    display: inline-block;
+    background: #fff;
+    color: var(--primary);
+    padding: 0.9rem 2.5rem;
+    border-radius: var(--radius);
+    font-size: 1.05rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition:
+        transform 0.2s,
+        box-shadow 0.2s;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+.btn-hero:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Secciones de contenido ─────────────────────────────────── */
+.inicio-section {
+    padding: 4rem 2rem;
+}
+
+/* Sección alternada con fondo distinto */
+.inicio-section-alt {
+    background: var(--bg);
+}
+
+/* Contenedor centrado con ancho máximo */
+.inicio-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+/* Título de cada sección */
+.inicio-section-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+
+/* Párrafo de texto de sección */
+.inicio-section-text {
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1.7;
+    margin-bottom: 1rem;
+    text-align: center;
+    max-width: 680px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ── Tarjetas de características ────────────────────────────── */
+.inicio-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+/* Tarjeta individual de característica */
+.inicio-feature-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: var(--shadow);
+    transition: transform 0.2s;
+}
+.inicio-feature-card:hover {
+    transform: translateY(-3px);
+}
+
+/* Icono de la tarjeta */
+.inicio-feature-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+}
+
+/* Título de la tarjeta */
+.inicio-feature-card h3 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    color: var(--text);
+}
+
+/* Descripción de la tarjeta */
+.inicio-feature-card p {
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+/* ── Pasos numerados ─────────────────────────────────────────── */
+.inicio-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 2rem;
+    max-width: 640px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Fila de un paso: número + contenido */
+.inicio-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.25rem;
+}
+
+/* Número del paso en círculo */
+.inicio-step-num {
+    width: 2.5rem;
+    height: 2.5rem;
+    min-width: 2.5rem; /* Evita que se encoja */
+    background: var(--primary);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+/* Contenido textual del paso */
+.inicio-step-body h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.3rem;
+    color: var(--text);
+}
+
+.inicio-step-body p {
+    font-size: 0.9rem;
+    color: var(--muted);
+    line-height: 1.6;
+}
+
+/* ── Pie de página ───────────────────────────────────────────── */
+.inicio-footer {
+    margin-top: auto; /* Empuja el footer al final de la página */
+    padding: 1.5rem 2rem;
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    border-top: 1px solid var(--border);
+    background: var(--card-bg);
+}
+
+/* ── Enlace de vuelta en la página de auth ───────────────────── */
+.auth-back {
+    display: block;
+    text-align: center;
+    margin-bottom: 0.75rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-decoration: none;
+}
+.auth-back:hover {
+    color: var(--primary);
+}
+
+/* 17. Guía de configuración de Thunderbird */
+
+/* Contenedor principal de la guía */
+.thunderbird-guide {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+}
+
+/* Título de la guía */
+.thunderbird-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+}
+
+/* Texto introductorio de la guía */
+.thunderbird-intro {
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-bottom: 1.25rem;
+    line-height: 1.6;
+}
+
+/* Fila de un paso de la guía */
+.tb-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+/* Número del paso en círculo pequeño */
+.tb-step-num {
+    width: 1.8rem;
+    height: 1.8rem;
+    min-width: 1.8rem;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.85rem;
+    margin-top: 0.1rem;
+}
+
+/* Contenido del paso */
+.tb-step-body h4 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+}
+
+.tb-step-body p {
+    font-size: 0.88rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 0.4rem;
+}
+
+/* Tabla de configuración de servidores */
+.tb-config-tabla {
+    margin-top: 0.75rem;
+    font-size: 0.85rem;
+}
+
+/* Celda con el nombre del servidor en monospace */
+.tb-server code {
+    font-family: monospace;
+    background: var(--bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+
+/* Nota de advertencia dentro de un paso */
+.tb-note {
+    background: #fef3c7;
+    border-left: 3px solid #f59e0b;
+    border-radius: 0 var(--radius) var(--radius) 0;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.83rem !important;
+    color: #78350f !important;
+    margin-top: 0.5rem;
+}
+
+/* Nota en dark mode */
+:root.dark .tb-note {
+    background: #2d1f00;
+    color: #fde68a !important;
+}
+
+:root.dark .tb-server code {
+    background: #0f172a;
+    color: var(--text);
+}
+
+/* 18. Banner */
+.inicio-banner {
+    background-image:
+        linear-gradient(135deg, rgba(20, 40, 120, 0.8), rgba(10, 20, 60, 0.9)),
+        url("../img/banner.png");
+
+    background-size: cover; /* evita mosaico raro */
+    background-repeat: no-repeat; /* clave: no duplicar */
+    background-position: center; /* centrado perfecto */
+
+    min-height: 60vh; /* evita que se “encoga demasiado” */
+    width: 100%;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    overflow: hidden; /* evita artefactos si escala */
+}
