@@ -140,14 +140,14 @@ sudo ufw allow in on "${IFACE_WAN}" \
 # Permitimos IMAPS y SMTP
 sudo ufw allow in on "${IFACE_WAN}" \
     to any port 993 proto tcp \
-    comment "IMAPS - DNAT redirige a Dovecot en SERVIDOR_SERVICIOS"
+    comment "IMAPS - DNAT redirige a Dovecot en el servidor de hosting"
 
 sudo ufw allow in on "${IFACE_WAN}" \
     to any port 587 proto tcp \
     comment "SMTP submission"
 
 # Permitimos SSH desde la red de la VPN
-sudo ufw allow from "${RED_VPN}" to any port 22 proto tcp
+sudo ufw allow from "${RED_VPN}"/"${MASCARA}" to any port 22 proto tcp
 
 # Aplicamos las reglas
 echo "y" | sudo ufw enable
