@@ -182,23 +182,31 @@ sudo cscli collections install crowdsecurity/linux
 
 # Fichero de fuentes de logs:
 sudo tee /etc/crowdsec/acquis.yaml > /dev/null <<EOF
+---
 # Logs de acceso de NPM: un archivo por cada proxy host.
-- filename: /var/lib/docker/volumes/npm_npm_data/_data/logs/proxy-host-*_access.log
+  source: file
+  filename: /var/lib/docker/volumes/npm_npm_data/_data/logs/proxy-host-*_access.log
   labels:
     type: nginx
 
+---
 # Logs de error de NPM:
-- filename: /var/lib/docker/volumes/npm_npm_data/_data/logs/proxy-host-*_error.log
+  source: file
+  filename: /var/lib/docker/volumes/npm_npm_data/_data/logs/proxy-host-*_error.log
   labels:
     type: nginx
 
+---
 # Logs de intentos de login/autenticación en el sistema:
-- filename: /var/log/auth.log
+  source: file
+  filename: /var/log/auth.log
   labels:
     type: syslog
 
+---
 # Logs del kernel:
-- filename: /var/log/kern.log
+  source: file
+  filename: /var/log/kern.log
   labels:
     type: syslog
 EOF
